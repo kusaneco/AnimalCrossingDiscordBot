@@ -40,12 +40,37 @@ async def on_message(message):
         try:
             # /kabu {カブ価}
             if len(split_message) == 2 and split_message[1].isdecimal():
-                price = int(split_message[1])
+                price = split_message[1]
                 # redis 記録処理
                 # now の場合は日付や午前午後も自動で取得する
-                key = f'{message.author}_{datetime.now().strftime("%Y-%m-%d_%p")}'
+                key = f'{message.author}_{datetime.now().strftime("%Y-%m-%d")}_{datetime.now().strftime("%p").lower()}'
                 repository.set(key, price)
                 reply_message = f'{message.author.mention} さんの今のカブ価は {price} ね。記録しておくだなも'
+                await message.channel.send(reply_message)
+            # /kabu YYYY-mm-dd {am or pm} {カブ価}
+            elif len(split_message) == 4:
+                register_date = split_message[1]
+                ampm = split_message[2]
+                price = split_message[3]
+
+                # とりあえず YYYY-mm-dd のところは 3 組の数字ならいい
+                split_register_date = register_date.split('-')
+                if len(split_register_date) != 3 or not all([x.isdecimal() for x in split_register_date]):
+                    raise ValueError
+
+                # am or pm であればいい
+                if ampm not in ['am', 'pm']:
+                    raise ValueError
+
+                # カブ価のところは数字であればいい
+                if not price.isdecimal():
+                    raise ValueError
+
+                # redis 記録処理
+                # now の場合は日付や午前午後も自動で取得する
+                key = f'{message.author}_{register_date}_{ampm}'
+                repository.set(key, price)
+                reply_message = f'{message.author.mention} さんの {register_date} ({ampm}) のカブ価は {price} ね。記録しておくだなも'
                 await message.channel.send(reply_message)
             # /kabu log
             elif len(split_message) == 2 and split_message[1] == 'log':
@@ -57,7 +82,7 @@ async def on_message(message):
                 for i in range(6):
                     check_date = start_date + timedelta(days=i)
                     key = f'{message.author}_{check_date}'
-                    for suffix in ['AM', 'PM']:
+                    for suffix in ['am', 'pm']:
                         price = repository.get(f'{key}_{suffix}')
                         if price is None:
                             price = '未集計'
